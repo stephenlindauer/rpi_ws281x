@@ -8,6 +8,9 @@ from led import LED
 from led_system import LEDSystem
 import sys
 from pattern import SimplePattern
+import os
+
+print(os.path.dirname(os.path.realpath(__file__)))
 
 
 COLOR_RED = Color(0, 255, 0)
@@ -60,17 +63,47 @@ args = parser.parse_args()
 
 system = LEDSystem()
 # system.createConfig()
-system.readConfig()
+system.readConfig(os.path.dirname(
+    os.path.realpath(__file__)) + "/wip-config.tmp")
 
 while True:
+    # Red White Green pattern
+    # p = SimplePattern(
+    #     [COLOR_WHITE, COLOR_GREEN, COLOR_RED])
+    # system.paintPatternOld(p, 10, 100)
+    p = SimplePattern(
+        [COLOR_WHITE, COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_RED, COLOR_RED])
+    system.paintPatternOld(p, 10, 100)
+    # p = SimplePattern(
+    #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED])
+    # system.paintPatternOld(p, 10, 100)
+
+    p = SimplePattern([COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE,
+                       COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
+    system.paintPatternOld(p, 60, 100)
+    # system.paintPatternRight(p, 60, 200)
+
+    p = SimplePattern(
+        [COLOR_BLUE, COLOR_BLUE, COLOR_BLUE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
+    system.paintPatternOld(p, 60, 100)
+
+    p = SimplePattern(
+        [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+    system.paintPatternOld(p, 10, 100)
+    p = SimplePattern(
+        [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+    system.paintPatternOld(p, 10, 100)
+    p = SimplePattern(
+        [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+    system.paintPatternOld(p, 10, 100)
+    p = SimplePattern(
+        [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+    system.paintPatternOld(p, 10, 100)
+    system.colorWipeInst(COLOR_OFF)
     delay = 10
     system.colorWipe(COLOR_WHITE, delay)
-    system.colorWipe(COLOR_BLUE, delay)
     system.colorWipe(COLOR_RED, delay)
     system.colorWipe(COLOR_GREEN, delay)
-    system.rainbow()
-    system.rainbowCycle()
-    system.theaterChaseRainbow()
 
 
 # tip = 93

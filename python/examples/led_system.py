@@ -8,7 +8,7 @@ import json
 COLOR_RED = Color(0, 255, 0)
 COLOR_BLUE = Color(0, 0, 255)
 COLOR_GREEN = Color(255, 0, 0)
-COLOR_WHITE = Color(255, 255, 255)
+COLOR_WHITE = Color(200, 200, 200)
 COLOR_OFF = Color(0, 0, 0)
 
 
@@ -19,7 +19,7 @@ class LEDSystem:
     min_y = float('inf')
     strip = None
 
-    def __init__(self, led_count=250):
+    def __init__(self, led_count=519, skip_intro=False):
         # LED strip configuration:
         # LED_COUNT = 100      # Number of LED pixels.
         # 18      # GPIO pin connected to the pixels (18 uses PWM!).
@@ -27,7 +27,8 @@ class LEDSystem:
         # LED_PIN        = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
         LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10      # DMA channel to use for generating signal (try 10)
-        LED_BRIGHTNESS = 150     # Set to 0 for darkest and 255 for brightest
+        LED_BRIGHTNESS = 100
+        # Set to 0 for darkest and 255 for brightest
         # True to invert the signal (when using NPN transistor level shift)
         LED_INVERT = False
         LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
@@ -39,9 +40,10 @@ class LEDSystem:
         self.lights = []
         self.nextId = 1
 
-        self.colorWipeInst(COLOR_OFF)
-        self.colorWipe(COLOR_GREEN, 20)
-        self.colorWipeInst(COLOR_OFF)
+        # if not skip_intro:
+        # self.colorWipeInst(COLOR_OFF)
+        # self.colorWipe(COLOR_GREEN, 20)
+        # self.colorWipeInst(COLOR_OFF)
 
         # while True:
         #     self.colorWipe(COLOR_RED, 50)
@@ -52,12 +54,30 @@ class LEDSystem:
     Goes through each LED on the strip and stores data about it to a config
     """
 
-    def createConfig(self):
+    def storeConfig(self, filename):
+        out = []
+        for led in self.lights:
+            out.append(led.serialize())
+        out_file = open(filename, "w")
+        out_file.write(json.dumps(out))
+        out_file.close()
+
+    def createConfig(self, resume_from_last=None):
         self.colorWipeInst(COLOR_OFF)
 
         last_pos = None
         last_led = None
-        for i in range(0, self.strip.numPixels()):
+        start = 0
+        if resume_from_last:
+            self.readConfig("wip-config.tmp")
+            print(self.led_mapping[resume_from_last])
+            last_led = self.led_mapping[resume_from_last]
+            last_pos = resume_from_last
+            start = resume_from_last+1
+            self.nextId = resume_from_last
+
+        for i in range(start, self.strip.numPixels()):
+            self.storeConfig("wip-config.tmp")
             self.colorWipeInst(COLOR_OFF)
             self.strip.setPixelColor(i-2, COLOR_WHITE)
             self.strip.setPixelColor(i-1, COLOR_WHITE)
@@ -67,37 +87,44 @@ class LEDSystem:
             if last_pos:
                 print(f"Last position was: {last_pos}")
 
-            pos = input("Position: ")
-            if pos == "?":
-                val = input("Position to mark: ")
-                (x, y) = val.split(",")
-                self.lightX(int(x), COLOR_GREEN)
-                self.lightY(int(y), COLOR_BLUE)
-                pos = input("Position: ")
+            pos = None
+            while True:
+                pos = input("Position (or mark x,y / clear): ")
+                if pos.startswith("mark "):
+                    try:
+                        (x, y) = pos[5:].split(",")
+                        self.lightY(int(y), COLOR_BLUE)
+                        self.lightX(int(x), COLOR_GREEN)
+                    except Exception:
+                        print("...huh?")
+                elif pos == "clear":
+                    self.colorWipeInst(COLOR_OFF)
+                elif pos == "list":
+                    for l in self.lights:
+                        print(l.serialize())
+                else:
+                    try:
+                        (x, y) = pos.split(",")
+                        led = LED(self.strip, self.nextId, i, int(x), int(y))
+                        self.nextId += 1
+                        if last_led:
+                            last_led.addNext(led)
+                        last_pos = pos
+                        break
+                    except Exception as e:
+                        print("Exception: " + e)
+                        print("Unsure if last LED saved or not")
 
-            last_pos = pos
-            (x, y) = pos.split(",")
-            led = LED(self.strip, self.nextId, i, int(x), int(y))
-            self.nextId += 1
-            if last_led:
-                is_next = input(f"Is LED#{i} after LED#{i-1}? [y/n] ") == "y"
-                if is_next:
-                    last_led.addNext(led)
             self.addLED(led)
             last_led = led
-            self.strip.setPixelColor(i, COLOR_OFF)
 
         print("Finished mapping strip.")
         if input("Write to file? ") == "y":
-            out = []
-            for led in self.lights:
-                out.append(led.serialize())
-            out_file = open("config", "w")
-            out_file.write(json.dumps(out))
-            out_file.close()
+            self.storeConfig("config")
 
-    def readConfig(self):
-        in_file = open("config", "r")
+    def readConfig(self, config_name="config"):
+        print("Opening config " + config_name)
+        in_file = open(config_name, "r")
         data = json.loads(in_file.read())
         leds = {}
         # Create LED objects
@@ -112,6 +139,7 @@ class LEDSystem:
             for id in d["next"]:
                 next = leds[id]
                 led.addNext(next)
+        self.led_mapping = leds
 
     def colorWipe(self, color, wait_ms=10):
         """Wipe color across display a pixel at a time."""
@@ -242,6 +270,18 @@ class LEDSystem:
                 for l in self.lights:
                     if l.xPos == x:
                         l.setColor(color)
+
+            self.strip.show()
+            pattern.bump()
+            time.sleep(delay_ms/1000.0)
+            t += delay_ms
+
+    def paintPatternOld(self, pattern, duration_s=60, delay_ms=20):
+        t = 0
+        while t < duration_s * 1000.0:
+            for i in range(self.strip.numPixels()):
+                color = pattern.getColor(i)
+                self.strip.setPixelColor(i, color)
 
             self.strip.show()
             pattern.bump()
