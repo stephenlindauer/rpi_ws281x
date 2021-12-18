@@ -13,5 +13,5 @@ class SimplePattern:
     def setColors(self, colors):
         self.colors = colors
 
-    def bump(self):
-        self.i += 1
+    def bump(self, bump_value=1):
+        self.i += bump_value

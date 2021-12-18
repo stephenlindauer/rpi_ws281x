@@ -4,6 +4,8 @@ import argparse
 import math
 from led import LED
 import json
+from datetime import datetime, timedelta
+
 
 COLOR_RED = Color(0, 255, 0)
 COLOR_BLUE = Color(0, 0, 255)
@@ -18,25 +20,12 @@ class LEDSystem:
     min_x = float('inf')
     min_y = float('inf')
     strip = None
+    is_bright = False
+    led_count = 600
 
-    def __init__(self, led_count=519, skip_intro=False):
-        # LED strip configuration:
-        # LED_COUNT = 100      # Number of LED pixels.
-        # 18      # GPIO pin connected to the pixels (18 uses PWM!).
-        LED_PIN = 12
-        # LED_PIN        = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
-        LED_DMA = 10      # DMA channel to use for generating signal (try 10)
-        LED_BRIGHTNESS = 100
-        # Set to 0 for darkest and 255 for brightest
-        # True to invert the signal (when using NPN transistor level shift)
-        LED_INVERT = False
-        LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
-
-        self.strip = Adafruit_NeoPixel(led_count, LED_PIN, LED_FREQ_HZ,
-                                       LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-        self.strip.begin()
-
+    def __init__(self, led_count=600, skip_intro=False):
+        self.led_count = led_count
+        self.setupStrip()
         self.lights = []
         self.nextId = 1
 
@@ -49,6 +38,34 @@ class LEDSystem:
         #     self.colorWipe(COLOR_RED, 50)
         #     self.colorWipe(COLOR_GREEN, 50)
         #     self.colorWipe(COLOR_WHITE, 50)
+
+    def setupStrip(self):
+        # LED strip configuration:
+        # 18      # GPIO pin connected to the pixels (18 uses PWM!).
+        LED_PIN = 12
+        # LED_PIN        = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
+        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+        LED_DMA = 10      # DMA channel to use for generating signal (try 10)
+
+        LED_BRIGHTNESS = 100
+        # Set to 0 for darkest and 255 for brightest
+        # True to invert the signal (when using NPN transistor level shift)
+        LED_INVERT = False
+        LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+
+        self.strip = Adafruit_NeoPixel(self.led_count, LED_PIN, LED_FREQ_HZ,
+                                       LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+        self.strip.begin()
+        self.configureBrightness()
+
+    def configureBrightness(self):
+        now = datetime.now()
+        now_hour = int(now.strftime("%H"))
+
+        # Use lower brightness from 5pm - 7am, otherwise blast it
+        brightness = 100 if now_hour < 7 and now_hour > 17 else 255
+        print("Setup strip with brightness: " + str(brightness))
+        self.strip.setBrightness(brightness)
 
     """
     Goes through each LED on the strip and stores data about it to a config
@@ -63,7 +80,7 @@ class LEDSystem:
         out_file.close()
 
     def createConfig(self, resume_from_last=None):
-        self.colorWipeInst(COLOR_OFF)
+        self.colorWipeInst(COLOR_OFF, True)
 
         last_pos = None
         last_led = None
@@ -79,9 +96,9 @@ class LEDSystem:
         for i in range(start, self.strip.numPixels()):
             self.storeConfig("wip-config.tmp")
             self.colorWipeInst(COLOR_OFF)
-            self.strip.setPixelColor(i-2, COLOR_WHITE)
-            self.strip.setPixelColor(i-1, COLOR_WHITE)
-            self.strip.setPixelColor(i, COLOR_RED)
+            self._setPixelColor(i-2, COLOR_WHITE)
+            self._setPixelColor(i-1, COLOR_WHITE)
+            self._setPixelColor(i, COLOR_RED)
             self.strip.show()
             print(f"Lit up bulb #{i}")
             if last_pos:
@@ -141,17 +158,23 @@ class LEDSystem:
                 led.addNext(next)
         self.led_mapping = leds
 
+    def _setPixelColor(self, i, color, ignore_block_list=False):
+        block_list = list(range(420, 500))
+        if i in block_list and not ignore_block_list:
+            return
+        self.strip.setPixelColor(i, color)
+
     def colorWipe(self, color, wait_ms=10):
         """Wipe color across display a pixel at a time."""
         for i in range(self.strip.numPixels()):
-            self.strip.setPixelColor(i, color)
+            self._setPixelColor(i, color)
             self.strip.show()
             time.sleep(wait_ms/1000.0)
 
-    def colorWipeInst(self, color):
+    def colorWipeInst(self, color, ignore_block_list=False):
         """Wipe color across display a pixel at a time."""
         for i in range(self.strip.numPixels()):
-            self.strip.setPixelColor(i, color)
+            self._setPixelColor(i, color, ignore_block_list)
         self.strip.show()
 
     def theaterChase(self, color, wait_ms=50, iterations=10):
@@ -159,11 +182,11 @@ class LEDSystem:
         for j in range(iterations):
             for q in range(3):
                 for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i+q, color)
+                    self._setPixelColor(i+q, color)
                 self.strip.show()
                 time.sleep(wait_ms/1000.0)
                 for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i+q, 0)
+                    self._setPixelColor(i+q, 0)
 
     def wheel(self, pos):
         """Generate rainbow colors across 0-255 positions."""
@@ -180,7 +203,7 @@ class LEDSystem:
         """Draw rainbow that fades across all pixels at once."""
         for j in range(256*iterations):
             for i in range(self.strip.numPixels()):
-                self.strip.setPixelColor(i, self.wheel((i+j) & 255))
+                self._setPixelColor(i, self.wheel((i+j) & 255))
             self.strip.show()
             time.sleep(wait_ms/1000.0)
 
@@ -188,7 +211,7 @@ class LEDSystem:
         """Draw rainbow that uniformly distributes itself across all pixels."""
         for j in range(256*iterations):
             for i in range(self.strip.numPixels()):
-                self.strip.setPixelColor(
+                self._setPixelColor(
                     i, self.wheel((int(i * 256 / self.strip.numPixels()) + j) & 255))
             self.strip.show()
             time.sleep(wait_ms/1000.0)
@@ -198,11 +221,11 @@ class LEDSystem:
         for j in range(256):
             for q in range(3):
                 for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i+q, self.wheel((i+j) % 255))
+                    self._setPixelColor(i+q, self.wheel((i+j) % 255))
                 self.strip.show()
                 time.sleep(wait_ms/1000.0)
                 for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i+q, 0)
+                    self._setPixelColor(i+q, 0)
 
     def addLED(self, led):
         self.lights.append(led)
@@ -277,13 +300,27 @@ class LEDSystem:
             t += delay_ms
 
     def paintPatternOld(self, pattern, duration_s=60, delay_ms=20):
+        print("paintPatternOld")
         t = 0
         while t < duration_s * 1000.0:
             for i in range(self.strip.numPixels()):
                 color = pattern.getColor(i)
-                self.strip.setPixelColor(i, color)
+                self._setPixelColor(i, color)
 
             self.strip.show()
             pattern.bump()
+            time.sleep(delay_ms/1000.0)
+            t += delay_ms
+
+    def paintPatternCounterClockwise(self, pattern, duration_s=60, delay_ms=20):
+        print("paintPatternCounterClockwise")
+        t = 0
+        while t < duration_s * 1000.0:
+            for i in range(self.strip.numPixels()):
+                color = pattern.getColor(i)
+                self._setPixelColor(i, color)
+
+            self.strip.show()
+            pattern.bump(-1)
             time.sleep(delay_ms/1000.0)
             t += delay_ms
