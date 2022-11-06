@@ -12,6 +12,10 @@ import os
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+from programs.strobe import StrobeProgram
+from programs.heartbeat import HeartbeatProgram
+from programs.tail import TailProgram
+from programs.candycane import CandyCaneProgram
 
 print(os.path.dirname(os.path.realpath(__file__)))
 
@@ -50,15 +54,27 @@ parser.add_argument('-s', '--skip-startup', action='store_true',
                     help='Clear startup animation')
 args = parser.parse_args()
 
-system = LEDSystem(led_count=50)
+system = LEDSystem(led_count=200)
+print("Starting")
 # system.createConfig()
 system.readConfig(os.path.dirname(
     os.path.realpath(__file__)) + "/wip-config.tmp")
 
-system.colorWipeInst(COLOR_PURPLE, True)
-
-
 system.start()
+# system.addProgram(StrobeProgram(), 0)
+# system.addProgram(HeartbeatProgram(), 10)
+system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=30), 11)
+system.addProgram(CandyCaneProgram(stripe_length=10,
+                  gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=None, is_reversed=True), 12)
+system.addProgram(CandyCaneProgram(stripe_length=10,
+                  gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=None, is_reversed=True), 12)
+
+system.addProgram(CandyCaneProgram(stripe_length=21,
+                  gap_length=4, stripe_rgb=[0, 200, 0], gap_rgb=[255, 255, 50], program_range=range(100, 200)), 12)
+
+# system.addProgram(TailProgram(length=10), 15)
+# system.addProgram(TailProgram(length=12, offset=15,
+#                   is_reversed=True, speed=1, fade=False, rgb=[0, 0, 255]), 16)
 
 # # Real Pattern below
 # it = 0

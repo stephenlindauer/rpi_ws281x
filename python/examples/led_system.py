@@ -1,5 +1,5 @@
 import time
-from rpi_ws281x import Color, Adafruit_NeoPixel
+from rpi_ws281x import Color, Adafruit_NeoPixel, WS2811_STRIP_RGB
 import argparse
 import math
 from led import LED
@@ -17,6 +17,7 @@ COLOR_OFF = Color(0, 0, 0)
 
 
 class LEDSystem:
+    ups = 20
     max_x = float('-inf')
     max_y = float('-inf')
     min_x = float('inf')
@@ -24,9 +25,10 @@ class LEDSystem:
     strip = None
     is_bright = False
     led_count = 600
+    programs = {}
 
     it = 0
-    animationType = "heartbeat"
+    animationType = "startup"
     hearbeatStep = 0
     heartbeatBrightness = 255
 
@@ -35,16 +37,6 @@ class LEDSystem:
         self.setupStrip()
         self.lights = []
         self.nextId = 1
-
-        # if not skip_intro:
-        # self.colorWipeInst(COLOR_OFF)
-        # self.colorWipe(COLOR_GREEN, 20)
-        # self.colorWipeInst(COLOR_OFF)
-
-        # while True:
-        #     self.colorWipe(COLOR_RED, 50)
-        #     self.colorWipe(COLOR_GREEN, 50)
-        #     self.colorWipe(COLOR_WHITE, 50)
 
     def start(self):
         self._update()
@@ -57,16 +49,30 @@ class LEDSystem:
             print("update() Exception: " + e)
 
         self.it += 1
-        self._timer = Timer(1 / 20.0, self._update)
+        self._timer = Timer(1 / self.ups, self._update)
         self._timer.start()
 
     def update(self):
-        if (self.animationType == 'heartbeat'):
-            self.updateHeartbeat()
-        elif (self.animationType == 'strobe'):
-            self.updateStrobe()
-        else:
-            print("Not sure what to do here")
+        # Calls update in depth order from least -> greatest so highest depth renders on top
+        depths = list(self.programs.keys())
+        depths.sort()
+        for depth in depths:
+            for p in self.programs[depth]:
+                p.update(self.it)
+
+        # Old, delete these in favor of programs
+        # if (self.animationType == 'heartbeat'):
+        #     self.updateHeartbeat()
+        # elif (self.animationType == 'strobe'):
+        #     self.updateStrobe()
+        # elif (self.animationType == 'startup'):
+        #     self.updateStartup()
+        # elif (self.animationType == 'tail'):
+        #     self.updateTail()
+        # elif (self.animationType == 'off'):
+        #     pass
+        # else:
+        #     print("Not sure what to do here")
 
         # if (self.it % 4 < 2):
         #     self.paint(COLOR_RED)
@@ -83,15 +89,23 @@ class LEDSystem:
             self.heartbeatBrightness -= 16
         elif (self.it % step < 30):
             self.heartbeatBrightness += 16
-        # elif (self.it % step < 40):
-        #     self.heartbeatBrightness += 16
         elif (self.it % step < 80):
             self.heartbeatBrightness -= 6
-        # else:
-        #     self.heartbeatBrightness += 16
-        print("bright: %d" % self.heartbeatBrightness)
         self.heartbeatBrightness = max(min(self.heartbeatBrightness, 255), 0)
         self.paint(Color(0, int(self.heartbeatBrightness), 0))
+
+    def updateStartup(self):
+        self.paint(COLOR_OFF)
+        self.paint(COLOR_BLUE, range(self.it %
+                   self.led_count, self.it % self.led_count+1))
+
+    def updateTail(self):
+        length = 30
+        # self.paint(COLOR_OFF)
+        for i in range(0, length):
+            p = (self.it - i) % self.led_count
+            self.paint(Color(0, 0, int(255 * (1 - i / length))),
+                       range(p, p + 1))
 
     def updateStrobe(self):
         step = 26
@@ -121,6 +135,15 @@ class LEDSystem:
     def setAnimation(self, type):
         print("Setting new animation type")
         self.animationType = type
+        if (type == 'off'):
+            self.paint(COLOR_OFF)
+
+    def addProgram(self, program, depth=1):
+        program.registerSystem(self)
+        if depth not in self.programs:
+            # Create empty list at this depth if nothing here
+            self.programs[depth] = []
+        self.programs[depth].append(program)
 
     # Everything below here is old stuff, likely not compatible with the new drawing system
     # HERE BE DRAGONS
@@ -130,7 +153,7 @@ class LEDSystem:
         # 18      # GPIO pin connected to the pixels (18 uses PWM!).
         LED_PIN = 12
         # LED_PIN        = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+        LED_FREQ_HZ = 400000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10      # DMA channel to use for generating signal (try 10)
 
         LED_BRIGHTNESS = 255
@@ -140,7 +163,7 @@ class LEDSystem:
         LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
         self.strip = Adafruit_NeoPixel(self.led_count, LED_PIN, LED_FREQ_HZ,
-                                       LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+                                       LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL, strip_type=WS2811_STRIP_RGB)
         self.strip.begin()
         self.configureBrightness()
 
