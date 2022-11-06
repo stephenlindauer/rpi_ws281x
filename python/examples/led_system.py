@@ -5,12 +5,14 @@ import math
 from led import LED
 import json
 from datetime import datetime, timedelta
+from threading import Timer
 
 
 COLOR_RED = Color(0, 255, 0)
 COLOR_BLUE = Color(0, 0, 255)
 COLOR_GREEN = Color(255, 0, 0)
-COLOR_WHITE = Color(200, 200, 200)
+COLOR_WHITE = Color(255, 255, 255)
+COLOR_WHITE2 = Color(255, 255, 230)
 COLOR_OFF = Color(0, 0, 0)
 
 
@@ -22,6 +24,11 @@ class LEDSystem:
     strip = None
     is_bright = False
     led_count = 600
+
+    it = 0
+    animationType = "heartbeat"
+    hearbeatStep = 0
+    heartbeatBrightness = 255
 
     def __init__(self, led_count=600, skip_intro=False):
         self.led_count = led_count
@@ -39,6 +46,85 @@ class LEDSystem:
         #     self.colorWipe(COLOR_GREEN, 50)
         #     self.colorWipe(COLOR_WHITE, 50)
 
+    def start(self):
+        self._update()
+
+    def _update(self):
+        try:
+            self.update()
+            self.strip.show()
+        except Exception as e:
+            print("update() Exception: " + e)
+
+        self.it += 1
+        self._timer = Timer(1 / 20.0, self._update)
+        self._timer.start()
+
+    def update(self):
+        if (self.animationType == 'heartbeat'):
+            self.updateHeartbeat()
+        elif (self.animationType == 'strobe'):
+            self.updateStrobe()
+        else:
+            print("Not sure what to do here")
+
+        # if (self.it % 4 < 2):
+        #     self.paint(COLOR_RED)
+        # else:
+        #     self.paint(COLOR_WHITE, range(10, 40))
+
+    def updateHeartbeat(self):
+        step = 70
+        if (self.it % step == 0):
+            self.heartbeatBrightness = 0
+        if (self.it % step < 10):
+            self.heartbeatBrightness += 25
+        elif (self.it % step < 20):
+            self.heartbeatBrightness -= 16
+        elif (self.it % step < 30):
+            self.heartbeatBrightness += 16
+        # elif (self.it % step < 40):
+        #     self.heartbeatBrightness += 16
+        elif (self.it % step < 80):
+            self.heartbeatBrightness -= 6
+        # else:
+        #     self.heartbeatBrightness += 16
+        print("bright: %d" % self.heartbeatBrightness)
+        self.heartbeatBrightness = max(min(self.heartbeatBrightness, 255), 0)
+        self.paint(Color(0, int(self.heartbeatBrightness), 0))
+
+    def updateStrobe(self):
+        step = 26
+        if (self.it % step < 6):
+            self.paint(COLOR_WHITE2)
+        elif (self.it % step < 10):
+            self.paint(COLOR_OFF)
+        elif (self.it % step < 13):
+            self.paint(COLOR_OFF)
+        elif (self.it % step < 16):
+            self.paint(COLOR_WHITE2)
+        elif (self.it % step < 19):
+            self.paint(COLOR_OFF)
+        elif (self.it % step < 22):
+            self.paint(COLOR_WHITE2)
+        else:
+            self.paint(COLOR_OFF)
+
+    def paint(self, color, lightRange=None):
+        if not lightRange:
+            r = range(self.strip.numPixels())
+        else:
+            r = lightRange
+        for i in r:
+            self._setPixelColor(i, color, True)
+
+    def setAnimation(self, type):
+        print("Setting new animation type")
+        self.animationType = type
+
+    # Everything below here is old stuff, likely not compatible with the new drawing system
+    # HERE BE DRAGONS
+
     def setupStrip(self):
         # LED strip configuration:
         # 18      # GPIO pin connected to the pixels (18 uses PWM!).
@@ -47,7 +133,7 @@ class LEDSystem:
         LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10      # DMA channel to use for generating signal (try 10)
 
-        LED_BRIGHTNESS = 100
+        LED_BRIGHTNESS = 255
         # Set to 0 for darkest and 255 for brightest
         # True to invert the signal (when using NPN transistor level shift)
         LED_INVERT = False
@@ -59,13 +145,15 @@ class LEDSystem:
         self.configureBrightness()
 
     def configureBrightness(self):
-        now = datetime.now()
-        now_hour = int(now.strftime("%H"))
+        pass
 
-        # Use lower brightness from 5pm - 7am, otherwise blast it
-        brightness = 100 if now_hour < 7 and now_hour > 17 else 255
-        print("Setup strip with brightness: " + str(brightness))
-        self.strip.setBrightness(brightness)
+        # now = datetime.now()
+        # now_hour = int(now.strftime("%H"))
+
+        # # Use lower brightness from 5pm - 7am, otherwise blast it
+        # brightness = 100 if now_hour < 7 and now_hour > 17 else 255
+        # print("Setup strip with brightness: " + str(brightness))
+        # self.strip.setBrightness(brightness)
 
     """
     Goes through each LED on the strip and stores data about it to a config

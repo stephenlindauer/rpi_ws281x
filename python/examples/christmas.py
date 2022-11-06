@@ -9,6 +9,7 @@ from led_system import LEDSystem
 import sys
 from pattern import SimplePattern
 import os
+from datetime import datetime
 
 print(os.path.dirname(os.path.realpath(__file__)))
 
@@ -18,6 +19,7 @@ COLOR_BLUE = Color(0, 0, 255)
 COLOR_GREEN = Color(255, 0, 0)
 COLOR_DARK_GREEN = Color(180, 0, 0)
 COLOR_WHITE = Color(255, 255, 255)
+COLOR_WHITE_2 = Color(100, 100, 100)
 COLOR_OFF = Color(0, 0, 0)
 
 
@@ -84,73 +86,91 @@ system.colorWipeInst(COLOR_OFF, True)
 # Real Pattern below
 while True:
     print("Start loop")
-    system.configureBrightness()
+    now = datetime.now()
+    now_hour = int(now.strftime("%H"))
+    if now_hour >= 22 or now_hour < 16:
+        p = SimplePattern(
+            [COLOR_WHITE, COLOR_GREEN, COLOR_RED])
+        system.paintPatternOld(p, 10, 100)
+        #system.colorWipeInst(COLOR_OFF, True)
+        #time.sleep(60)
+    else:
+        # Red White Green pattern
+        # p = SimplePattern(
+        #     [COLOR_WHITE, COLOR_GREEN, COLOR_RED])
+        # system.paintPatternOld(p, 10, 100)
+        patt = []
+        # [COLOR_WHITE, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2, COLOR_WHITE_2]
+        for i in range(25):
+            patt.append(Color(i*5, i*5, i*5))
+        for i in range(24, 0, -1):
+            patt.append(Color(i*5, i*5, i*5))
+        for i in range(20):
+            patt.append(COLOR_OFF)
+        p = SimplePattern(patt)
+        system.paintPatternCounterClockwise(p, 120, 500)
 
-    # Red White Green pattern
-    # p = SimplePattern(
-    #     [COLOR_WHITE, COLOR_GREEN, COLOR_RED])
-    # system.paintPatternOld(p, 10, 100)
-    p = SimplePattern(
-        [COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p.setColors(
-        [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
-    system.paintPatternCounterClockwise(p, 10, 100)
+        p = SimplePattern(
+            [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+        system.paintPatternCounterClockwise(p, 120, 500)
+        # p.setColors(
+        #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_DARK_GREEN])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p.setColors(
+        #     [COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
+        # system.paintPatternCounterClockwise(p, 10, 100)
 
-    p = SimplePattern(
-        [COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_WHITE, COLOR_RED, COLOR_RED, COLOR_RED])
-    system.paintPatternOld(p, 100, 100)
-    # p = SimplePattern(
-    #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED])
-    # system.paintPatternOld(p, 10, 100)
+        # p = SimplePattern(
+        #     [COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_WHITE, COLOR_RED, COLOR_RED, COLOR_RED])
+        # system.paintPatternOld(p, 100, 100)
+        # p = SimplePattern(
+        #     [COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED])
+        # system.paintPatternOld(p, 10, 100)
 
-    p = SimplePattern([COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE,
-                       COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
-    system.paintPatternCounterClockwise(p, 60, 100)
-    # system.paintPatternRight(p, 60, 200)
+        # p = SimplePattern([COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_RED, COLOR_WHITE,
+        #                    COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
+        # system.paintPatternCounterClockwise(p, 60, 100)
+        # # system.paintPatternRight(p, 60, 200)
 
-    p = SimplePattern(
-        [COLOR_BLUE, COLOR_BLUE, COLOR_BLUE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
-    system.paintPatternOld(p, 60, 100)
+        # p = SimplePattern(
+        #     [COLOR_BLUE, COLOR_BLUE, COLOR_BLUE, COLOR_WHITE, COLOR_WHITE, COLOR_WHITE])
+        # system.paintPatternOld(p, 60, 100)
 
-    p = SimplePattern(
-        [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
-    system.paintPatternOld(p, 10, 100)
-    p = SimplePattern(
-        [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
-    system.paintPatternOld(p, 10, 100)
-    p = SimplePattern(
-        [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    p = SimplePattern(
-        [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
-    system.paintPatternCounterClockwise(p, 10, 100)
-    system.colorWipeInst(COLOR_OFF)
-    delay = 10
-    system.colorWipe(COLOR_WHITE, delay)
-    system.colorWipe(COLOR_RED, delay)
-    system.colorWipe(COLOR_GREEN, delay)
+        # p = SimplePattern(
+        #     [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+        # system.paintPatternOld(p, 10, 100)
+        # p = SimplePattern(
+        #     [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+        # system.paintPatternOld(p, 10, 100)
+        # p = SimplePattern(
+        #     [COLOR_RED, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # p = SimplePattern(
+        #     [COLOR_WHITE, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF, COLOR_OFF])
+        # system.paintPatternCounterClockwise(p, 10, 100)
+        # system.colorWipeInst(COLOR_OFF)
+        # delay = 10
+        # system.colorWipe(COLOR_WHITE, delay)
+        # system.colorWipe(COLOR_RED, delay)
+        # system.colorWipe(COLOR_GREEN, delay)
 
 
 # tip = 93

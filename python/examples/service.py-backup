@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+import time
+from rpi_ws281x import Color
+import argparse
+import math
+from led import LED
+from led_system import LEDSystem
+import sys
+from pattern import SimplePattern
+import os
+from datetime import datetime
+
+print(os.path.dirname(os.path.realpath(__file__)))
+
+
+COLOR_RED = Color(0, 255, 0)
+COLOR_BLUE = Color(0, 0, 255)
+COLOR_GREEN_DIM = Color(150, 0, 0)
+COLOR_GREEN = Color(255, 0, 0)
+COLOR_DARK_GREEN = Color(180, 0, 0)
+COLOR_WHITE = Color(255, 255, 255)
+COLOR_OFF_WHITE = Color(248, 240, 200)
+COLOR_WHITE_2 = Color(100, 100, 100)
+COLOR_OFF = Color(0, 0, 0)
+COLOR_PURPLE = Color(153, 51, 255)
+COLOR_ORANGE = Color(255, 153, 51)
+
+
+def colorWipe(strip, color, wait_ms=10):
+    """Wipe color across display a pixel at a time."""
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, color)
+        strip.show()
+        time.sleep(wait_ms/1000.0)
+
+
+def colorWipeInst(strip, color, wait_ms=10):
+    """Wipe color across display a pixel at a time."""
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, color)
+    strip.show()
+
+
+# Process arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('-s', '--skip-startup', action='store_true',
+                    help='Clear startup animation')
+args = parser.parse_args()
+
+system = LEDSystem(led_count=50)
+# system.createConfig()
+system.readConfig(os.path.dirname(
+    os.path.realpath(__file__)) + "/wip-config.tmp")
+
+system.colorWipeInst(COLOR_OFF, True)
+
+
+def sleepUntilNextHourStart():
+    n = datetime.now()
+    t = (60*60)-(n.minute*60+n.second)
+    print("Waiting {} seconds".format(t))
+    time.sleep(t)
+
+
+# Real Pattern below
+while True:
+    print("Start loop")
+    now = datetime.now()
+    now_hour = int(now.strftime("%H"))
+    # if now_hour >= 22 or now_hour < 16:
+    # p = SimplePattern(
+    #     [COLOR_BLUE, COLOR_BLUE, COLOR_BLUE, COLOR_WHITE, COLOR_WHITE])
+    # system.paintPatternOld(p, 10, 100)
+    delay = 0
+    if now_hour >= 17 or now_hour < 8:
+        system.colorWipeInst(COLOR_GREEN_DIM, True)
+    else:
+        # system.colorWipeInst(COLOR_OFF_WHITE, True)
+        system.colorWipeInst(COLOR_OFF, True)
+
+    sleepUntilNextHourStart()
+    system.colorWipe(COLOR_BLUE, True)
+    time.sleep(1)
+    system.colorWipe(COLOR_OFF, True)
+    time.sleep(1)
+    system.colorWipe(COLOR_BLUE, True)
+    time.sleep(1)
+
+    # system.theaterChase(Color(127, 127, 127))  # White theater chase
+    # system.theaterChase(Color(127,   0,   0))  # Red theater chase
+    # system.theaterChase(Color(0,   0, 127))  # Blue theater chase
+    # system.rainbow()
+    # system.rainbowCycle()
+    # system.theaterChaseRainbow()
