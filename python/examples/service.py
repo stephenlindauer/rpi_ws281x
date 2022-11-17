@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# How to Start/Stop service:
+# sudo systemctl start lights
+# sudo systemctl stop lights
+
 import time
 from rpi_ws281x import Color
 import argparse
@@ -17,62 +21,62 @@ from programs.heartbeat import HeartbeatProgram
 from programs.tail import TailProgram
 from programs.candycane import CandyCaneProgram
 
-print(os.path.dirname(os.path.realpath(__file__)))
-
-
-COLOR_RED = Color(0, 255, 0)
-COLOR_BLUE = Color(0, 0, 255)
-COLOR_GREEN_DIM = Color(150, 0, 0)
-COLOR_GREEN = Color(255, 0, 0)
-COLOR_DARK_GREEN = Color(180, 0, 0)
-COLOR_WHITE = Color(255, 255, 255)
-COLOR_OFF_WHITE = Color(248, 240, 200)
-COLOR_WHITE_2 = Color(100, 100, 100)
-COLOR_OFF = Color(0, 0, 0)
-COLOR_PURPLE = Color(40, 140, 225)
-COLOR_ORANGE = Color(100, 255, 0)
-
-
-def colorWipe(strip, color, wait_ms=10):
-    """Wipe color across display a pixel at a time."""
-    for i in range(strip.numPixels()):
-        strip.setPixelColor(i, color)
-        strip.show()
-        time.sleep(wait_ms/1000.0)
-
-
-def colorWipeInst(strip, color, wait_ms=10):
-    """Wipe color across display a pixel at a time."""
-    for i in range(strip.numPixels()):
-        strip.setPixelColor(i, color)
-    strip.show()
-
-
-# Process arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('-s', '--skip-startup', action='store_true',
-                    help='Clear startup animation')
-args = parser.parse_args()
 
 system = LEDSystem(led_count=200)
 print("Starting")
-# system.createConfig()
-system.readConfig(os.path.dirname(
-    os.path.realpath(__file__)) + "/wip-config.tmp")
 
+system.configure({
+    "components": [
+        {
+            "label": "main_strip",
+            "light_begin": "infer",
+            "length": "infer",
+            "components": [
+                {
+                    "label": "strip1",
+                    "light_begin": 0,
+                    "length": 50
+                },
+                {
+                    "label": "strip2",
+                    "light_begin": 50,
+                    "length": 50
+                }
+            ]
+        },
+        {
+            "label": "wreath",
+            "light_begin": 100,
+            "length": 100,
+        }
+    ]
+})
 system.start()
+
+main_strip = system.getComponentByName("main_strip")
+print("main_strip=", main_strip)
+wreath = system.getComponentByName("wreath")
+print("wreath=", wreath)
+
+
 # system.addProgram(StrobeProgram(), 0)
 # system.addProgram(HeartbeatProgram(), 10)
-system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=30), 11)
-system.addProgram(CandyCaneProgram(stripe_length=10,
-                  gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=None, is_reversed=True), 12)
-system.addProgram(CandyCaneProgram(stripe_length=10,
-                  gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=None, is_reversed=True), 12)
+system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=50), 11)
+# system.addProgram(CandyCaneProgram(stripe_length=10,
+#                   gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=[0, 0, 0], is_reversed=True), 12)
 
-system.addProgram(CandyCaneProgram(stripe_length=21,
-                  gap_length=4, stripe_rgb=[0, 200, 0], gap_rgb=[255, 255, 50], program_range=range(100, 200)), 12)
+# wreath
+# system.addProgram(CandyCaneProgram(stripe_length=21,
+#                   gap_length=4, stripe_rgb=[0, 200, 0], gap_rgb=[255, 255, 50], program_range=range(100, 200)), 12)
+# system.addProgram(CandyCaneProgram(stripe_length=2, offset=10,
+#                   gap_length=23, stripe_rgb=[255, 255, 50], gap_rgb=None, program_range=range(100, 200)), 13)
 
-# system.addProgram(TailProgram(length=10), 15)
+# system.addProgram(TailProgram(
+#     length=10, rgb=[255, 0, 0], program_range=range(0, 200)), 15)
+
+# system.addProgram(TailProgram(
+#     length=3, rgb=[0, 0, 0], program_range=range(100, 200), is_reversed=True, speed=1.5), 15)
+
 # system.addProgram(TailProgram(length=12, offset=15,
 #                   is_reversed=True, speed=1, fade=False, rgb=[0, 0, 255]), 16)
 
@@ -150,14 +154,14 @@ class MyServer(BaseHTTPRequestHandler):
         self.wfile.write(bytes("</body></html>", "utf-8"))
 
 
-if __name__ == "__main__":
-    webServer = HTTPServer((hostName, serverPort), MyServer)
-    print("Server started http://%s:%s" % (hostName, serverPort))
+# if __name__ == "__main__":
+#     webServer = HTTPServer((hostName, serverPort), MyServer)
+#     print("Server started http://%s:%s" % (hostName, serverPort))
 
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
+#     try:
+#         webServer.serve_forever()
+#     except KeyboardInterrupt:
+#         pass
 
-    webServer.server_close()
-    print("Server stopped.")
+#     webServer.server_close()
+#     print("Server stopped.")

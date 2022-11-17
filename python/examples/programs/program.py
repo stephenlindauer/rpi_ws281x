@@ -1,13 +1,16 @@
+from led_system import LEDSystem
+
+
 class Program():
     name = ""
-    system = None
+    system: LEDSystem = None
     program_range = None
 
     def __init__(self, name, program_range=None):
         self.name = name
         self.program_range = program_range
 
-    def registerSystem(self, system):
+    def registerSystem(self, system: LEDSystem):
         self.system = system
 
     def update(self):

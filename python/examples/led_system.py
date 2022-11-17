@@ -6,18 +6,26 @@ from led import LED
 import json
 from datetime import datetime, timedelta
 from threading import Timer
+import logging
+from typing import Optional
 
 
-COLOR_RED = Color(0, 255, 0)
-COLOR_BLUE = Color(0, 0, 255)
-COLOR_GREEN = Color(255, 0, 0)
-COLOR_WHITE = Color(255, 255, 255)
-COLOR_WHITE2 = Color(255, 255, 230)
-COLOR_OFF = Color(0, 0, 0)
+class LEDComponentObject:
+    components: list["LEDComponentObject"] = []
+
+    def __init__(self, label, light_begin, length):
+        self.label = label
+        self.light_begin = light_begin
+        self.length = length
+        self.components = []
+
+    def update(self, it: int):
+        for component in self.components:
+            component.update(it)
 
 
 class LEDSystem:
-    ups = 20
+    ups = 20  # Updates per Second
     max_x = float('-inf')
     max_y = float('-inf')
     min_x = float('inf')
@@ -26,8 +34,10 @@ class LEDSystem:
     is_bright = False
     led_count = 600
     programs = {}
+    components: list[LEDComponentObject] = []
+    componentMap: dict[str, LEDComponentObject] = {}
 
-    it = 0
+    it: int = 0
     animationType = "startup"
     hearbeatStep = 0
     heartbeatBrightness = 255
@@ -42,89 +52,64 @@ class LEDSystem:
         self._update()
 
     def _update(self):
+        self.it += 1
+        self._timer = Timer(1 / self.ups, self._update)
+        self._timer.start()
         try:
             self.update()
             self.strip.show()
         except Exception as e:
             print("update() Exception: " + e)
 
-        self.it += 1
-        self._timer = Timer(1 / self.ups, self._update)
-        self._timer.start()
-
     def update(self):
         # Calls update in depth order from least -> greatest so highest depth renders on top
+        # OLD
         depths = list(self.programs.keys())
         depths.sort()
         for depth in depths:
             for p in self.programs[depth]:
                 p.update(self.it)
+        # NEW
+        for component in self.components:
+            component.update(self.it)
 
-        # Old, delete these in favor of programs
-        # if (self.animationType == 'heartbeat'):
-        #     self.updateHeartbeat()
-        # elif (self.animationType == 'strobe'):
-        #     self.updateStrobe()
-        # elif (self.animationType == 'startup'):
-        #     self.updateStartup()
-        # elif (self.animationType == 'tail'):
-        #     self.updateTail()
-        # elif (self.animationType == 'off'):
-        #     pass
-        # else:
-        #     print("Not sure what to do here")
+    def configure(self, config):
+        for c in config["components"]:
+            self.components.append(self.parseComponentFromConfig(c))
 
-        # if (self.it % 4 < 2):
-        #     self.paint(COLOR_RED)
-        # else:
-        #     self.paint(COLOR_WHITE, range(10, 40))
+    def parseComponentFromConfig(self, c) -> LEDComponentObject:
+        # Validation
+        if "label" not in c:
+            logging.warning('Component is missing a label')
+        if c["label"] in self.componentMap:
+            logging.warning(
+                'Label %s was reused which is not allowed' % c["label"])
+        if c["light_begin"] == 'infer' or c["length"] == 'infer':
+            if 'components' not in c:
+                logging.warning(
+                    "Cannot infer begin/end without child components")
 
-    def updateHeartbeat(self):
-        step = 70
-        if (self.it % step == 0):
-            self.heartbeatBrightness = 0
-        if (self.it % step < 10):
-            self.heartbeatBrightness += 25
-        elif (self.it % step < 20):
-            self.heartbeatBrightness -= 16
-        elif (self.it % step < 30):
-            self.heartbeatBrightness += 16
-        elif (self.it % step < 80):
-            self.heartbeatBrightness -= 6
-        self.heartbeatBrightness = max(min(self.heartbeatBrightness, 255), 0)
-        self.paint(Color(0, int(self.heartbeatBrightness), 0))
-
-    def updateStartup(self):
-        self.paint(COLOR_OFF)
-        self.paint(COLOR_BLUE, range(self.it %
-                   self.led_count, self.it % self.led_count+1))
-
-    def updateTail(self):
-        length = 30
-        # self.paint(COLOR_OFF)
-        for i in range(0, length):
-            p = (self.it - i) % self.led_count
-            self.paint(Color(0, 0, int(255 * (1 - i / length))),
-                       range(p, p + 1))
-
-    def updateStrobe(self):
-        step = 26
-        if (self.it % step < 6):
-            self.paint(COLOR_WHITE2)
-        elif (self.it % step < 10):
-            self.paint(COLOR_OFF)
-        elif (self.it % step < 13):
-            self.paint(COLOR_OFF)
-        elif (self.it % step < 16):
-            self.paint(COLOR_WHITE2)
-        elif (self.it % step < 19):
-            self.paint(COLOR_OFF)
-        elif (self.it % step < 22):
-            self.paint(COLOR_WHITE2)
-        else:
-            self.paint(COLOR_OFF)
+        component = LEDComponentObject(
+            c["label"], c["light_begin"], c["length"])
+        self.componentMap[component.label] = component
+        if ("components" in c):
+            min_light = float('inf')
+            max_light_end = float('-inf')
+            for child in c["components"]:
+                child_component = self.parseComponentFromConfig(child)
+                component.components.append(child_component)
+                min_light = min(min_light, child_component.light_begin)
+                max_light_end = max(
+                    max_light_end, child_component.light_begin + child_component.length)
+        if component.light_begin == 'infer':
+            component.light_begin = min_light
+        if component.length == 'infer':
+            component.length = max_light_end
+            print("DEBUG: set inferred length="+str(max_light_end))
+        return component
 
     def paint(self, color, lightRange=None):
+        """Paints a range of leds a single color"""
         if not lightRange:
             r = range(self.strip.numPixels())
         else:
@@ -132,31 +117,24 @@ class LEDSystem:
         for i in r:
             self._setPixelColor(i, color, True)
 
-    def setAnimation(self, type):
-        print("Setting new animation type")
-        self.animationType = type
-        if (type == 'off'):
-            self.paint(COLOR_OFF)
-
     def addProgram(self, program, depth=1):
+        """Adds"""
         program.registerSystem(self)
         if depth not in self.programs:
             # Create empty list at this depth if nothing here
             self.programs[depth] = []
         self.programs[depth].append(program)
 
-    # Everything below here is old stuff, likely not compatible with the new drawing system
-    # HERE BE DRAGONS
-
     def setupStrip(self):
+        """Setup of the rpi_ws281x strip"""
         # LED strip configuration:
         # 18      # GPIO pin connected to the pixels (18 uses PWM!).
         LED_PIN = 12
         # LED_PIN        = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-        LED_FREQ_HZ = 400000  # LED signal frequency in hertz (usually 800khz)
+        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10      # DMA channel to use for generating signal (try 10)
 
-        LED_BRIGHTNESS = 255
+        LED_BRIGHTNESS = 100
         # Set to 0 for darkest and 255 for brightest
         # True to invert the signal (when using NPN transistor level shift)
         LED_INVERT = False
@@ -165,109 +143,102 @@ class LEDSystem:
         self.strip = Adafruit_NeoPixel(self.led_count, LED_PIN, LED_FREQ_HZ,
                                        LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL, strip_type=WS2811_STRIP_RGB)
         self.strip.begin()
-        self.configureBrightness()
 
-    def configureBrightness(self):
-        pass
+    def getComponentByName(self, name) -> Optional[LEDComponentObject]:
+        return self.componentMap[name]
 
-        # now = datetime.now()
-        # now_hour = int(now.strftime("%H"))
+    # Everything below here is old stuff, likely not compatible with the new drawing system
+    # HERE BE DRAGONS
 
-        # # Use lower brightness from 5pm - 7am, otherwise blast it
-        # brightness = 100 if now_hour < 7 and now_hour > 17 else 255
-        # print("Setup strip with brightness: " + str(brightness))
-        # self.strip.setBrightness(brightness)
+    # """
+    # Goes through each LED on the strip and stores data about it to a config
+    # """
+    # def storeConfig(self, filename):
+    #     out = []
+    #     for led in self.lights:
+    #         out.append(led.serialize())
+    #     out_file = open(filename, "w")
+    #     out_file.write(json.dumps(out))
+    #     out_file.close()
 
-    """
-    Goes through each LED on the strip and stores data about it to a config
-    """
+    # def createConfig(self, resume_from_last=None):
+    #     self.colorWipeInst(COLOR_OFF, True)
 
-    def storeConfig(self, filename):
-        out = []
-        for led in self.lights:
-            out.append(led.serialize())
-        out_file = open(filename, "w")
-        out_file.write(json.dumps(out))
-        out_file.close()
+    #     last_pos = None
+    #     last_led = None
+    #     start = 0
+    #     if resume_from_last:
+    #         self.readConfig("wip-config.tmp")
+    #         print(self.led_mapping[resume_from_last])
+    #         last_led = self.led_mapping[resume_from_last]
+    #         last_pos = resume_from_last
+    #         start = resume_from_last+1
+    #         self.nextId = resume_from_last
 
-    def createConfig(self, resume_from_last=None):
-        self.colorWipeInst(COLOR_OFF, True)
+    #     for i in range(start, self.strip.numPixels()):
+    #         self.storeConfig("wip-config.tmp")
+    #         self.colorWipeInst(COLOR_OFF)
+    #         self._setPixelColor(i-2, COLOR_WHITE)
+    #         self._setPixelColor(i-1, COLOR_WHITE)
+    #         self._setPixelColor(i, COLOR_RED)
+    #         self.strip.show()
+    #         print(f"Lit up bulb #{i}")
+    #         if last_pos:
+    #             print(f"Last position was: {last_pos}")
 
-        last_pos = None
-        last_led = None
-        start = 0
-        if resume_from_last:
-            self.readConfig("wip-config.tmp")
-            print(self.led_mapping[resume_from_last])
-            last_led = self.led_mapping[resume_from_last]
-            last_pos = resume_from_last
-            start = resume_from_last+1
-            self.nextId = resume_from_last
+    #         pos = None
+    #         while True:
+    #             pos = input("Position (or mark x,y / clear): ")
+    #             if pos.startswith("mark "):
+    #                 try:
+    #                     (x, y) = pos[5:].split(",")
+    #                     self.lightY(int(y), COLOR_BLUE)
+    #                     self.lightX(int(x), COLOR_GREEN)
+    #                 except Exception:
+    #                     print("...huh?")
+    #             elif pos == "clear":
+    #                 self.colorWipeInst(COLOR_OFF)
+    #             elif pos == "list":
+    #                 for l in self.lights:
+    #                     print(l.serialize())
+    #             else:
+    #                 try:
+    #                     (x, y) = pos.split(",")
+    #                     led = LED(self.strip, self.nextId, i, int(x), int(y))
+    #                     self.nextId += 1
+    #                     if last_led:
+    #                         last_led.addNext(led)
+    #                     last_pos = pos
+    #                     break
+    #                 except Exception as e:
+    #                     print("Exception: " + e)
+    #                     print("Unsure if last LED saved or not")
 
-        for i in range(start, self.strip.numPixels()):
-            self.storeConfig("wip-config.tmp")
-            self.colorWipeInst(COLOR_OFF)
-            self._setPixelColor(i-2, COLOR_WHITE)
-            self._setPixelColor(i-1, COLOR_WHITE)
-            self._setPixelColor(i, COLOR_RED)
-            self.strip.show()
-            print(f"Lit up bulb #{i}")
-            if last_pos:
-                print(f"Last position was: {last_pos}")
+    #         self.addLED(led)
+    #         last_led = led
 
-            pos = None
-            while True:
-                pos = input("Position (or mark x,y / clear): ")
-                if pos.startswith("mark "):
-                    try:
-                        (x, y) = pos[5:].split(",")
-                        self.lightY(int(y), COLOR_BLUE)
-                        self.lightX(int(x), COLOR_GREEN)
-                    except Exception:
-                        print("...huh?")
-                elif pos == "clear":
-                    self.colorWipeInst(COLOR_OFF)
-                elif pos == "list":
-                    for l in self.lights:
-                        print(l.serialize())
-                else:
-                    try:
-                        (x, y) = pos.split(",")
-                        led = LED(self.strip, self.nextId, i, int(x), int(y))
-                        self.nextId += 1
-                        if last_led:
-                            last_led.addNext(led)
-                        last_pos = pos
-                        break
-                    except Exception as e:
-                        print("Exception: " + e)
-                        print("Unsure if last LED saved or not")
+    #     print("Finished mapping strip.")
+    #     if input("Write to file? ") == "y":
+    #         self.storeConfig("config")
 
-            self.addLED(led)
-            last_led = led
-
-        print("Finished mapping strip.")
-        if input("Write to file? ") == "y":
-            self.storeConfig("config")
-
-    def readConfig(self, config_name="config"):
-        print("Opening config " + config_name)
-        in_file = open(config_name, "r")
-        data = json.loads(in_file.read())
-        leds = {}
-        # Create LED objects
-        for d in data:
-            led = LED(self.strip, d["id"], d["lightIdx"],
-                      int(d["xPos"]), int(d["yPos"]))
-            leds[led.id] = led
-            self.addLED(led)
-        # Add neighbors
-        for d in data:
-            led = leds[d["id"]]
-            for id in d["next"]:
-                next = leds[id]
-                led.addNext(next)
-        self.led_mapping = leds
+    # def readConfig(self, config_name="config"):
+    #     print("Opening config " + config_name)
+    #     in_file = open(config_name, "r")
+    #     data = json.loads(in_file.read())
+    #     leds = {}
+    #     # Create LED objects
+    #     for d in data:
+    #         led = LED(self.strip, d["id"], d["lightIdx"],
+    #                   int(d["xPos"]), int(d["yPos"]))
+    #         leds[led.id] = led
+    #         self.addLED(led)
+    #     # Add neighbors
+    #     for d in data:
+    #         led = leds[d["id"]]
+    #         for id in d["next"]:
+    #             next = leds[id]
+    #             led.addNext(next)
+    #     self.led_mapping = leds
 
     def _setPixelColor(self, i, color, ignore_block_list=False):
         block_list = list(range(420, 500))
@@ -338,63 +309,63 @@ class LEDSystem:
                 for i in range(0, self.strip.numPixels(), 3):
                     self._setPixelColor(i+q, 0)
 
-    def addLED(self, led):
-        self.lights.append(led)
-        self.max_x = max(self.max_x, led.xPos)
-        self.max_y = max(self.max_y, led.yPos)
-        self.min_x = min(self.min_x, led.xPos)
-        self.min_y = min(self.min_y, led.yPos)
+    # def addLED(self, led):
+    #     self.lights.append(led)
+    #     self.max_x = max(self.max_x, led.xPos)
+    #     self.max_y = max(self.max_y, led.yPos)
+    #     self.min_x = min(self.min_x, led.xPos)
+    #     self.min_y = min(self.min_y, led.yPos)
 
-    def lightX(self, xPos, color):
-        for l in self.lights:
-            if l.xPos == xPos:
-                l.setColor(color)
-        self.strip.show()
+    # def lightX(self, xPos, color):
+    #     for l in self.lights:
+    #         if l.xPos == xPos:
+    #             l.setColor(color)
+    #     self.strip.show()
 
-    def lightY(self, yPos, color):
-        for l in self.lights:
-            if l.yPos == yPos:
-                l.setColor(color)
-        self.strip.show()
+    # def lightY(self, yPos, color):
+    #     for l in self.lights:
+    #         if l.yPos == yPos:
+    #             l.setColor(color)
+    #     self.strip.show()
 
-    def coverRightByPosition(self, color, delay=20):
-        for x in range(self.min_x, self.max_x+1):
-            self.lightX(x, color)
-            time.sleep(delay/1000.0)
+    # def coverRightByPosition(self, color, delay=20):
+    #     for x in range(self.min_x, self.max_x+1):
+    #         self.lightX(x, color)
+    #         time.sleep(delay/1000.0)
 
-    def coverLeftByPosition(self, color, delay=20):
-        for x in range(self.max_x, self.min_x-1, -1):
-            self.lightX(x, color)
-            time.sleep(delay/1000.0)
+    # def coverLeftByPosition(self, color, delay=20):
+    #     for x in range(self.max_x, self.min_x-1, -1):
+    #         self.lightX(x, color)
+    #         time.sleep(delay/1000.0)
 
-    def coverDownByPosition(self, color, delay=20):
-        for y in range(self.max_y, self.min_y-1, -1):
-            for l in self.lights:
-                if l.yPos == y:
-                    l.setColor(color)
-            self.strip.show()
-            time.sleep(delay/1000.0)
+    # def coverDownByPosition(self, color, delay=20):
+    #     for y in range(self.max_y, self.min_y-1, -1):
+    #         for l in self.lights:
+    #             if l.yPos == y:
+    #                 l.setColor(color)
+    #         self.strip.show()
+    #         time.sleep(delay/1000.0)
 
-    def coverUpByPosition(self, color, delay=20):
-        for y in range(self.min_y, self.max_y+1):
-            for l in self.lights:
-                if l.yPos == y:
-                    l.setColor(color)
-            self.strip.show()
-            time.sleep(delay/1000.0)
+    # def coverUpByPosition(self, color, delay=20):
+    #     for y in range(self.min_y, self.max_y+1):
+    #         for l in self.lights:
+    #             if l.yPos == y:
+    #                 l.setColor(color)
+    #         self.strip.show()
+    #         time.sleep(delay/1000.0)
 
-    def coverNextByNeighbor(self, first, color, delay=20):
-        nexts = [first]
-        i = 0
-        while i < 100:  # TODO: How long should this run?
-            i = i+1
-            upcoming_nexts = []
-            for next in nexts:
-                next.setColor(color)
-                upcoming_nexts.extend(next.next)
-            self.strip.show()
-            time.sleep(delay/1000.0)
-            nexts = upcoming_nexts
+    # def coverNextByNeighbor(self, first, color, delay=20):
+    #     nexts = [first]
+    #     i = 0
+    #     while i < 100:  # TODO: How long should this run?
+    #         i = i+1
+    #         upcoming_nexts = []
+    #         for next in nexts:
+    #             next.setColor(color)
+    #             upcoming_nexts.extend(next.next)
+    #         self.strip.show()
+    #         time.sleep(delay/1000.0)
+    #         nexts = upcoming_nexts
 
     def paintPatternRight(self, pattern, duration_s=60, delay_ms=20):
         t = 0

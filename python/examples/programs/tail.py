@@ -3,8 +3,8 @@ from rpi_ws281x import Color
 
 
 class TailProgram(Program):
-    def __init__(self, length=30, offset=0, is_reversed=False, speed=1, rgb=[255, 255, 255], fade=True):
-        super().__init__("tail")
+    def __init__(self, length=30, offset=0, is_reversed=False, speed=1, rgb=[255, 255, 255], fade=True, program_range=None):
+        super().__init__("tail", program_range)
 
         self.length = length
         self.offset = offset
@@ -19,9 +19,12 @@ class TailProgram(Program):
         else:
             x = 1
 
+        effective_range = self.program_range or range(0, self.system.led_count)
+
         for i in range(0, self.length):
             p = int(((x * it * self.speed) - (x*i) +
-                     self.offset)) % self.system.led_count
+                     self.offset)) % (effective_range.stop - effective_range.start) + effective_range.start
+
             pct = (1 - i / self.length) if self.fade else 1
             self.paint(
                 Color(
