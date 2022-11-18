@@ -4,25 +4,32 @@
 # sudo systemctl start lights
 # sudo systemctl stop lights
 
-import time
+import asyncio
 from rpi_ws281x import Color
-import argparse
-import math
 from led import LED
 from led_system import LEDSystem
-import sys
 from pattern import SimplePattern
-import os
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
 from programs.strobe import StrobeProgram
 from programs.heartbeat import HeartbeatProgram
 from programs.tail import TailProgram
 from programs.candycane import CandyCaneProgram
+import threading
+from wsserver import WebSocketServer
+from httpserver import HTTPServerWrapper
+import json
+
+
+def onChange(bulb, color, previous):
+    asyncio.run(websocket_server.send(json.dumps({
+        "bulb": bulb,
+        "color": color
+    })))
+    # print("Bulb %d changed to %d from %d" % (bulb, color, previous))
 
 
 system = LEDSystem(led_count=200)
+system.onChangeListener = onChange
 print("Starting")
 
 system.configure({
@@ -61,18 +68,18 @@ print("wreath=", wreath)
 
 # system.addProgram(StrobeProgram(), 0)
 # system.addProgram(HeartbeatProgram(), 10)
-system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=50), 11)
+system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=30), 11)
 # system.addProgram(CandyCaneProgram(stripe_length=10,
-#                   gap_length=20, stripe_rgb=[0, 0, 255], gap_rgb=[0, 0, 0], is_reversed=True), 12)
+#                   gap_length=20, stripe_rgb=[0, 0, 0], gap_rgb=[250, 0, 0], is_reversed=True), 12)
 
 # wreath
-# system.addProgram(CandyCaneProgram(stripe_length=21,
-#                   gap_length=4, stripe_rgb=[0, 200, 0], gap_rgb=[255, 255, 50], program_range=range(100, 200)), 12)
-# system.addProgram(CandyCaneProgram(stripe_length=2, offset=10,
-#                   gap_length=23, stripe_rgb=[255, 255, 50], gap_rgb=None, program_range=range(100, 200)), 13)
+system.addProgram(CandyCaneProgram(stripe_length=21,
+                  gap_length=4, stripe_rgb=[0, 200, 0], gap_rgb=[255, 255, 50], program_range=range(100, 200)), 12)
+system.addProgram(CandyCaneProgram(stripe_length=2, offset=10,
+                  gap_length=23, stripe_rgb=[255, 255, 50], gap_rgb=None, program_range=range(100, 200)), 13)
 
 # system.addProgram(TailProgram(
-#     length=10, rgb=[255, 0, 0], program_range=range(0, 200)), 15)
+#     length=10, rgb=[0, 255, 0], program_range=range(0, 200)), 15)
 
 # system.addProgram(TailProgram(
 #     length=3, rgb=[0, 0, 0], program_range=range(100, 200), is_reversed=True, speed=1.5), 15)
@@ -102,66 +109,29 @@ system.addProgram(CandyCaneProgram(stripe_length=10, gap_length=50), 11)
 #     # system.theaterChaseRainbow()
 
 
-# Start Webserver
-hostName = "0.0.0.0"
-serverPort = 8080
+def start_webserver():
+    HTTPServerWrapper().start()
 
 
-class MyServer(BaseHTTPRequestHandler):
-    def do_GET(self):
-        print("do_get")
-
-        if (self.path == "/"):
-            self.handleIndex()
-        elif (self.path.startswith("/api/")):
-            self.handleAPIRequest()
-        else:
-            self.handle404()
-
-    def handleIndex(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(
-            bytes("<html><head><title>https://pythonbasics.org</title></head>", "utf-8"))
-        self.wfile.write(bytes("<p>Request: %s</p>" % self.path, "utf-8"))
-        self.wfile.write(bytes("<body>", "utf-8"))
-        self.wfile.write(
-            bytes("<p>This is an example web server.</p>", "utf-8"))
-        self.wfile.write(bytes("</body></html>", "utf-8"))
-
-    def handleAPIRequest(self):
-        self.send_response(200)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        (_, api, endpoint, type) = self.path.split("/")
-        if (endpoint == 'animation'):
-            self.handleAnimation(type)
-        self.wfile.write(
-            bytes(json.dumps({"status": "OK"}), "utf-8"))
-
-    def handleAnimation(self, animationType):
-        system.setAnimation(animationType)
-
-    def handle404(self):
-        self.send_response(404)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(
-            bytes("<html><head><title>404</title></head>", "utf-8"))
-        self.wfile.write(bytes("<body>", "utf-8"))
-        self.wfile.write(bytes("<p>Page not found</p>", "utf-8"))
-        self.wfile.write(bytes("</body></html>", "utf-8"))
+def start_websocket():
+    global websocket_server
+    websocket_server = WebSocketServer()
+    websocket_server.start()
 
 
-# if __name__ == "__main__":
-#     webServer = HTTPServer((hostName, serverPort), MyServer)
-#     print("Server started http://%s:%s" % (hostName, serverPort))
+if __name__ == "__main__":
+    http_server = threading.Thread(target=start_webserver, args=())
+    ws_server = threading.Thread(target=start_websocket, args=())
 
-#     try:
-#         webServer.serve_forever()
-#     except KeyboardInterrupt:
-#         pass
+    # starting thread 1
+    http_server.start()
+    # starting thread 2
+    ws_server.start()
 
-#     webServer.server_close()
-#     print("Server stopped.")
+    # wait until thread 1 is completely executed
+    http_server.join()
+    # wait until thread 2 is completely executed
+    ws_server.join()
+
+    # both threads completely executed
+    print("Done!")

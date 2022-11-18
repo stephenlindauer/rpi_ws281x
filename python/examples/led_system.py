@@ -25,7 +25,7 @@ class LEDComponentObject:
 
 
 class LEDSystem:
-    ups = 20  # Updates per Second
+    ups = 10  # Updates per Second
     max_x = float('-inf')
     max_y = float('-inf')
     min_x = float('inf')
@@ -36,6 +36,9 @@ class LEDSystem:
     programs = {}
     components: list[LEDComponentObject] = []
     componentMap: dict[str, LEDComponentObject] = {}
+    onChangeListener = None
+    lastLedColor: dict[int, int] = {}
+    ledColor: dict[int, int] = {}
 
     it: int = 0
     animationType = "startup"
@@ -47,6 +50,9 @@ class LEDSystem:
         self.setupStrip()
         self.lights = []
         self.nextId = 1
+        for i in range(0, led_count):
+            self.ledColor[i] = -1
+            self.lastLedColor[i] = -1
 
     def start(self):
         self._update()
@@ -58,8 +64,9 @@ class LEDSystem:
         try:
             self.update()
             self.strip.show()
+            self.notifyChanges()
         except Exception as e:
-            print("update() Exception: " + e)
+            print("update() Exception: " + str(e))
 
     def update(self):
         # Calls update in depth order from least -> greatest so highest depth renders on top
@@ -72,6 +79,13 @@ class LEDSystem:
         # NEW
         for component in self.components:
             component.update(self.it)
+
+    def notifyChanges(self):
+        for i in range(0, self.led_count):
+            if self.ledColor[i] != self.lastLedColor[i]:
+                self.onChangeListener(
+                    i, self.ledColor[i], self.lastLedColor[i])
+        self.lastLedColor = self.ledColor.copy()
 
     def configure(self, config):
         for c in config["components"]:
@@ -242,8 +256,11 @@ class LEDSystem:
 
     def _setPixelColor(self, i, color, ignore_block_list=False):
         block_list = list(range(420, 500))
+        if i not in range(0, self.led_count):
+            return
         if i in block_list and not ignore_block_list:
             return
+        self.ledColor[i] = color
         self.strip.setPixelColor(i, color)
 
     def colorWipe(self, color, wait_ms=10):

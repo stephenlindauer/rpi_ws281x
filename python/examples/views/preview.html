@@ -1,0 +1,59 @@
+<html>
+    <head>
+        <style>
+            .light-preview {
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+            }
+        </style>
+        <script>
+            var dataSize = 0;
+
+            window.onload = (event) => {
+                for (i=0; i<200; i++) {
+                    document.getElementById("lights").innerHTML += (`<div id='light-${i}' class='light-preview'></div>`);
+                }
+
+                const socket = new WebSocket('ws://christmaspi:8765');
+                // Connection opened
+                socket.addEventListener('open', (event) => {
+                    socket.send('Hello Server!');
+                    setInterval(() => {
+                        console.log(`${parseInt(dataSize/1000)}kbps`);
+                        dataSize = 0;
+                    }, 1000);
+                });
+                socket.addEventListener('close', (event) => {
+                    console.log("Server closed")
+                });
+
+                // Listen for messages
+                socket.addEventListener('message', (event) => {
+                    // console.log('Message from server ', event.data);
+                    dataSize += event.data.length;
+                    const colorize = (c) => {
+                        str = c.toString(16);
+                        while (str.length < 6) {
+                            str = "0" + str;
+                        }
+                        return str;
+                    }
+                    try {
+                        msg = JSON.parse(event.data)
+                        // console.log(`bulb=${msg.bulb} set to ${msg.color} / #${colorize(msg.color)}`);
+                        document.getElementById("light-"+msg.bulb).style.backgroundColor = "#" + colorize(msg.color);
+                    } catch (e) {}
+
+                });
+            };
+        </script>
+    </head>
+    <body>
+        <h1>Preview</h1>
+
+        <div id="lights"></div>
+    </body>
+</html>
